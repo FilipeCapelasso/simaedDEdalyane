@@ -485,6 +485,7 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
               <button class="btn primario" id="btn-sb-salvar">Salvar e testar conexão</button>
               <button class="btn" id="btn-sb-sql">Ver o SQL das tabelas</button>
               <button class="btn perigo" id="btn-sb-limpar">Desconectar</button>
+              <button class="btn perigo" id="btn-apagar-conta">Apagar minha conta</button>
             </div>
             <div class="dica" style="margin-bottom:16px"><span>🔒</span><div>
               <b>Leia antes de usar com dados reais:</b> entrar só com celular e primeiro nome identifica a professora, mas não protege a conta — quem souber os dois entra, e a chave anônima dá acesso de leitura à tabela. Para uso oficial com dados de crianças, troque por <b>Supabase Auth com código por SMS</b> e restrinja as políticas a <code>auth.uid()</code>.</div></div>
@@ -561,58 +562,186 @@ const local={
 /* ===================== SUPABASE (REST) ===================== */
 const SB={
   url:'', key:'', pronto(){return !!(this.url&&this.key)},
-  async req(caminho,{method='GET',body,prefer}={}){
-    if(!this.pronto()) throw new Error('Supabase não configurado.');
+  async rpc(fn,args){
+    if(!this.pronto()) throw new Error('Supabase nao configurado.');
     let r;
     try{
-      r=await fetch(this.url.replace(/\/+$/,'')+'/rest/v1/'+caminho,{
-        method,
-        headers:{apikey:this.key,Authorization:'Bearer '+this.key,'Content-Type':'application/json',
-          Prefer:prefer||'return=representation'},
-        body:body?JSON.stringify(body):undefined
+      r=await fetch(this.url.replace(/\/+$/,'')+'/rest/v1/rpc/'+fn,{
+        method:'POST',
+        headers:{apikey:this.key,Authorization:'Bearer '+this.key,'Content-Type':'application/json'},
+        body:JSON.stringify(args||{})
       });
-    }catch(e){ throw new Error('Sem conexão com o servidor. Verifique a internet.'); }
+    }catch(e){ throw new Error('Sem conexao com o servidor. Verifique a internet.'); }
     const txt=await r.text();
     if(!r.ok){
-      let m=txt;
-      try{const j=JSON.parse(txt); m=j.message||j.hint||j.details||txt;}catch(e){}
-      if(r.status===404||/does not exist|relation/i.test(m)) m='As tabelas ainda não existem no banco. Rode o SQL em “Escola e conta”.';
-      if(r.status===401||r.status===403) m='Chave recusada pelo Supabase. Confira a URL e a chave anônima.';
-      throw new Error(m);
+      let bruto=txt;
+      try{const j=JSON.parse(txt); bruto=j.message||j.hint||j.details||txt;}catch(e){}
+      throw new Error(traduzErro(bruto,r.status));
     }
     return txt?JSON.parse(txt):null;
   }
 };
+const ERROS={
+  CELULAR_INVALIDO:'O celular precisa ter DDD e 10 ou 11 numeros.',
+  NOME_INVALIDO:'Escreva o seu primeiro nome.',
+  NOME_NAO_CONFERE:'Este celular ja esta cadastrado com outro nome. Escreva igual ao do primeiro acesso.',
+  TOKEN_AUSENTE:'Sessao sem credencial. Saia e entre de novo.',
+  TOKEN_INVALIDO:'Sua sessao expirou ou a conta foi apagada. Entre de novo.'
+};
+function traduzErro(msg,status){
+  const chave=Object.keys(ERROS).find(k=>String(msg).includes(k));
+  if(chave)return ERROS[chave];
+  if(status===404||/function .*does not exist|Could not find the function|schema cache/i.test(msg))
+    return 'As funcoes ainda nao existem no banco. Rode o SQL em "Escola e conta".';
+  if(status===401||status===403)return 'Chave recusada pelo Supabase. Confira a URL e a chave anonima.';
+  return String(msg||'Erro desconhecido no servidor.');
+}
 let USUARIO=null, MODO='local';
 
-const SQL=`-- Cole no SQL Editor do Supabase e clique em Run.
+const SQL=`-- PAUTA · Diário de Classe — cole no SQL Editor do Supabase e clique em RUN.
+create extension if not exists pgcrypto;
 
-create table if not exists usuarios (
-  id       uuid primary key default gen_random_uuid(),
-  celular  text unique not null,
-  nome     text not null,
-  criado_em timestamptz default now()
+create table if not exists public.professoras (
+  id            uuid primary key default gen_random_uuid(),
+  celular       text not null unique,
+  nome          text not null,
+  token         uuid not null default gen_random_uuid(),
+  criado_em     timestamptz not null default now(),
+  ultimo_acesso timestamptz not null default now(),
+  constraint celular_so_numeros check (celular ~ '^[0-9]{10,11}$'),
+  constraint nome_minimo check (char_length(btrim(nome)) >= 2)
+);
+create index if not exists professoras_token_idx on public.professoras (token);
+
+create table if not exists public.diarios (
+  user_id       uuid primary key references public.professoras(id) on delete cascade,
+  escola        jsonb not null default '{}'::jsonb,
+  alunos        jsonb not null default '[]'::jsonb,
+  frequencia    jsonb not null default '{}'::jsonb,
+  registros     jsonb not null default '{}'::jsonb,
+  atividades    jsonb not null default '[]'::jsonb,
+  config        jsonb not null default '{}'::jsonb,
+  atualizado_em timestamptz not null default now()
 );
 
-create table if not exists diarios (
-  user_id     uuid primary key references usuarios(id) on delete cascade,
-  escola      jsonb default '{}'::jsonb,
-  alunos      jsonb default '[]'::jsonb,
-  frequencia  jsonb default '{}'::jsonb,
-  registros   jsonb default '{}'::jsonb,
-  atividades  jsonb default '[]'::jsonb,
-  config      jsonb default '{}'::jsonb,
-  atualizado_em timestamptz default now()
-);
+create or replace function public.pauta_touch() returns trigger language plpgsql as $$
+begin new.atualizado_em := now(); return new; end; $$;
 
-alter table usuarios enable row level security;
-alter table diarios  enable row level security;
+drop trigger if exists diarios_touch on public.diarios;
+create trigger diarios_touch before update on public.diarios
+  for each row execute function public.pauta_touch();
 
--- ATENÇÃO: políticas abertas ao papel anon. Servem para testar.
--- Com dados reais de crianças, use Supabase Auth (OTP por SMS) e troque
--- "using (true)" por "using (auth.uid() = id)" / "using (auth.uid() = user_id)".
-create policy "anon usuarios" on usuarios for all to anon using (true) with check (true);
-create policy "anon diarios"  on diarios  for all to anon using (true) with check (true);`;
+-- RLS ligado e sem politicas: ninguem le as tabelas direto.
+alter table public.professoras enable row level security;
+alter table public.diarios     enable row level security;
+revoke all on public.professoras from anon, authenticated;
+revoke all on public.diarios     from anon, authenticated;
+
+create or replace function public.pauta_id_do_token(p_token uuid)
+returns uuid language plpgsql stable security definer set search_path = public as $$
+declare v_id uuid;
+begin
+  if p_token is null then raise exception 'TOKEN_AUSENTE'; end if;
+  select p.id into v_id from public.professoras p where p.token = p_token;
+  if v_id is null then raise exception 'TOKEN_INVALIDO'; end if;
+  return v_id;
+end; $$;
+revoke all on function public.pauta_id_do_token(uuid) from public, anon, authenticated;
+
+create or replace function public.pauta_ping() returns jsonb language sql stable as $$
+  select jsonb_build_object('ok', true, 'versao', 2, 'servidor_em', now());
+$$;
+
+create or replace function public.pauta_entrar(p_celular text, p_nome text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_cel text := regexp_replace(coalesce(p_celular,''), '[^0-9]', '', 'g');
+  v_nome text := btrim(coalesce(p_nome,''));
+  r public.professoras%rowtype;
+  v_novo boolean := false;
+begin
+  if char_length(v_cel) < 10 or char_length(v_cel) > 11 then raise exception 'CELULAR_INVALIDO'; end if;
+  if char_length(v_nome) < 2 then raise exception 'NOME_INVALIDO'; end if;
+  select * into r from public.professoras p where p.celular = v_cel;
+  if not found then
+    insert into public.professoras (celular, nome) values (v_cel, v_nome) returning * into r;
+    insert into public.diarios (user_id) values (r.id) on conflict (user_id) do nothing;
+    v_novo := true;
+  else
+    if lower(btrim(r.nome)) <> lower(v_nome) then raise exception 'NOME_NAO_CONFERE'; end if;
+    update public.professoras set ultimo_acesso = now() where id = r.id;
+    insert into public.diarios (user_id) values (r.id) on conflict (user_id) do nothing;
+  end if;
+  return jsonb_build_object('id', r.id, 'nome', r.nome, 'celular', r.celular,
+                            'token', r.token, 'novo', v_novo);
+end; $$;
+
+create or replace function public.pauta_carregar(p_token uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id uuid := public.pauta_id_do_token(p_token); v jsonb;
+begin
+  insert into public.diarios (user_id) values (v_id) on conflict (user_id) do nothing;
+  select jsonb_build_object('escola',d.escola,'alunos',d.alunos,'frequencia',d.frequencia,
+         'registros',d.registros,'atividades',d.atividades,'config',d.config,
+         'atualizado_em',d.atualizado_em)
+    into v from public.diarios d where d.user_id = v_id;
+  return coalesce(v, '{}'::jsonb);
+end; $$;
+
+create or replace function public.pauta_salvar(
+  p_token uuid, p_escola jsonb default null, p_alunos jsonb default null,
+  p_frequencia jsonb default null, p_registros jsonb default null,
+  p_atividades jsonb default null, p_config jsonb default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id uuid := public.pauta_id_do_token(p_token); v_em timestamptz;
+begin
+  insert into public.diarios (user_id) values (v_id) on conflict (user_id) do nothing;
+  update public.diarios d
+     set escola     = coalesce(p_escola, d.escola),
+         alunos     = coalesce(p_alunos, d.alunos),
+         frequencia = coalesce(p_frequencia, d.frequencia),
+         registros  = coalesce(p_registros, d.registros),
+         atividades = coalesce(p_atividades, d.atividades),
+         config     = coalesce(p_config, d.config)
+   where d.user_id = v_id returning d.atualizado_em into v_em;
+  return jsonb_build_object('ok', true, 'atualizado_em', v_em);
+end; $$;
+
+create or replace function public.pauta_limpar(p_token uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id uuid := public.pauta_id_do_token(p_token);
+begin
+  update public.diarios set escola='{}'::jsonb, alunos='[]'::jsonb, frequencia='{}'::jsonb,
+         registros='{}'::jsonb, atividades='[]'::jsonb, config='{}'::jsonb
+   where user_id = v_id;
+  return jsonb_build_object('ok', true);
+end; $$;
+
+create or replace function public.pauta_apagar_conta(p_token uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id uuid := public.pauta_id_do_token(p_token);
+begin
+  delete from public.professoras where id = v_id;
+  return jsonb_build_object('ok', true);
+end; $$;
+
+create or replace function public.pauta_renomear(p_token uuid, p_nome text)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare v_id uuid := public.pauta_id_do_token(p_token); v_nome text := btrim(coalesce(p_nome,''));
+begin
+  if char_length(v_nome) < 2 then raise exception 'NOME_INVALIDO'; end if;
+  update public.professoras set nome = v_nome where id = v_id;
+  return jsonb_build_object('ok', true, 'nome', v_nome);
+end; $$;
+
+grant usage on schema public to anon, authenticated;
+grant execute on function public.pauta_ping() to anon, authenticated;
+grant execute on function public.pauta_entrar(text, text) to anon, authenticated;
+grant execute on function public.pauta_carregar(uuid) to anon, authenticated;
+grant execute on function public.pauta_salvar(uuid, jsonb, jsonb, jsonb, jsonb, jsonb, jsonb) to anon, authenticated;
+grant execute on function public.pauta_limpar(uuid) to anon, authenticated;
+grant execute on function public.pauta_apagar_conta(uuid) to anon, authenticated;
+grant execute on function public.pauta_renomear(uuid, text) to anon, authenticated;`;
 
 /* -------- login -------- */
 const soDigitos=s=>String(s||'').replace(/\D/g,'');
@@ -640,34 +769,25 @@ function pintaConta(){
 
 async function autenticar(){
   const btn=$('#btn-entrar'), cel=soDigitos($('#cel-in').value), nome=$('#nome-in').value.trim();
-  const cxErro=$('#login-erro');
-  aviso(cxErro,'');
-  if(cel.length<10) return aviso(cxErro,'Digite o celular com DDD — 10 ou 11 números.','erro');
+  const cxErro=$('#login-erro'); aviso(cxErro,'');
+  if(cel.length<10) return aviso(cxErro,'Digite o celular com DDD \u2014 10 ou 11 n\u00fameros.','erro');
   if(nome.length<2) return aviso(cxErro,'Escreva o seu primeiro nome.','erro');
   if(!SB.pronto()){
-    USUARIO={id:'local-'+cel,nome,celular:cel}; MODO='local';
+    USUARIO={id:'local-'+cel,nome,celular:cel,token:null}; MODO='local';
     await local.set(K_SESSAO,USUARIO); await abrirApp();
-    return toast('Entrou no modo local. Configure o Supabase em “Escola e conta” para salvar na nuvem.');
+    return toast('Entrou no modo local. Configure o Supabase em \u201cEscola e conta\u201d para salvar na nuvem.');
   }
-  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Entrando…';
+  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Entrando\u2026';
   try{
-    const achados=await SB.req(`usuarios?celular=eq.${encodeURIComponent(cel)}&select=*`);
-    let u=achados&&achados[0];
-    if(u){
-      if((u.nome||'').trim().toLowerCase()!==nome.toLowerCase()){
-        aviso(cxErro,`Este celular já está cadastrado com outro nome. Confira se escreveu igual ao do primeiro acesso.`,'erro');
-        return;
-      }
-    }else{
-      const criado=await SB.req('usuarios',{method:'POST',body:{celular:cel,nome}});
-      u=criado[0]; toast('Conta criada. Seja bem-vinda!');
-    }
-    USUARIO=u; MODO='nuvem';
-    await local.set(K_SESSAO,{id:u.id,nome:u.nome,celular:u.celular});
+    const u=await SB.rpc('pauta_entrar',{p_celular:cel,p_nome:nome});
+    if(!u||!u.token) throw new Error('O servidor nao devolveu a credencial de acesso.');
+    USUARIO={id:u.id,nome:u.nome,celular:u.celular,token:u.token}; MODO='nuvem';
+    await local.set(K_SESSAO,USUARIO);
     await carregarDaNuvem();
     await abrirApp();
+    if(u.novo)toast('Conta criada. Seja bem-vinda!');
   }catch(e){
-    aviso(cxErro,'Não deu para entrar: '+esc(e.message),'erro');
+    aviso(cxErro,esc(e.message),'erro');
   }finally{
     btn.disabled=false; btn.textContent='Entrar';
   }
@@ -690,49 +810,50 @@ async function abrirApp(){
 }
 
 /* -------- carregar / salvar dados -------- */
-function paraLinha(){return{
-  escola:S.escola,alunos:S.alunos,frequencia:S.freq,registros:S.reg,atividades:S.atividades,
-  config:{prev:S.prev,off:S.off,mesAtivo:S.mesAtivo,mesReg:S.mesReg},atualizado_em:new Date().toISOString()};}
+function paraArgs(){return{
+  p_token:USUARIO&&USUARIO.token,
+  p_escola:S.escola, p_alunos:S.alunos, p_frequencia:S.freq, p_registros:S.reg,
+  p_atividades:S.atividades,
+  p_config:{prev:S.prev,off:S.off,mesAtivo:S.mesAtivo,mesReg:S.mesReg}};}
 function daLinha(l){
   S.escola=Object.assign(estadoNovo().escola,l.escola||{});
   S.alunos=l.alunos||[]; S.freq=l.frequencia||{}; S.reg=l.registros||{}; S.atividades=l.atividades||[];
-  const c=l.config||{}; S.prev=c.prev||{}; S.off=c.off||{}; S.mesAtivo=c.mesAtivo||mesAtual(); S.mesReg=c.mesReg||mesAtual();
+  const c=l.config||{}; S.prev=c.prev||{}; S.off=c.off||{};
+  S.mesAtivo=c.mesAtivo||mesAtual(); S.mesReg=c.mesReg||mesAtual();
 }
 async function carregarDaNuvem(){
-  const linhas=await SB.req(`diarios?user_id=eq.${USUARIO.id}&select=*`);
-  if(linhas&&linhas.length){
-    const remotoVazio=!(linhas[0].alunos||[]).length && !Object.keys(linhas[0].registros||{}).length;
-    const guardado=await local.get(K_DADOS);
-    if(remotoVazio && guardado && (guardado.alunos||[]).length &&
-       confirm('Encontrei dados salvos neste aparelho e a conta na nuvem está vazia. Enviar os dados do aparelho para a conta?')){
-      S=Object.assign(estadoNovo(),guardado); await salvarAgora(); return;
-    }
-    daLinha(linhas[0]);
-  }else{
-    const guardado=await local.get(K_DADOS);
-    if(guardado) S=Object.assign(estadoNovo(),guardado);
-    await SB.req('diarios',{method:'POST',body:Object.assign({user_id:USUARIO.id},paraLinha())});
+  const d=await SB.rpc('pauta_carregar',{p_token:USUARIO.token});
+  const vazio=!(d&&d.alunos&&d.alunos.length)&&!(d&&d.registros&&Object.keys(d.registros).length);
+  const guardado=await local.get(K_DADOS);
+  if(vazio&&guardado&&(guardado.alunos||[]).length&&
+     confirm('Encontrei dados salvos neste aparelho e a conta na nuvem esta vazia. Enviar os dados do aparelho para a conta?')){
+    S=Object.assign(estadoNovo(),guardado); await salvarAgora(); return;
   }
+  if(d&&Object.keys(d).length)daLinha(d);
 }
-let tSalvar=null, salvando=false;
-function marcaEstado(txt,cls){
-  const p=$('#pnt'); p.className='ponto'+(cls?' '+cls:''); $('#salvo-txt').textContent=txt;
-}
-function salvar(){ marcaEstado('Salvando…','busy'); clearTimeout(tSalvar); tSalvar=setTimeout(salvarAgora,700); }
+let tSalvar=null, salvando=false, pendente=false;
+function marcaEstado(txt,cls){ $('#pnt').className='ponto'+(cls?' '+cls:''); $('#salvo-txt').textContent=txt; }
+function salvar(){ marcaEstado('Salvando\u2026','busy'); clearTimeout(tSalvar); tSalvar=setTimeout(salvarAgora,700); }
 async function salvarAgora(){
-  if(salvando)return; salvando=true;
+  if(salvando){pendente=true;return}
+  salvando=true;
   try{
     await local.set(K_DADOS,S);
-    if(MODO==='nuvem'&&USUARIO){
-      const r=await SB.req(`diarios?user_id=eq.${USUARIO.id}`,{method:'PATCH',body:paraLinha()});
-      if(!r||!r.length) await SB.req('diarios',{method:'POST',body:Object.assign({user_id:USUARIO.id},paraLinha())});
+    if(MODO==='nuvem'&&USUARIO&&USUARIO.token){
+      await SB.rpc('pauta_salvar',paraArgs());
+      const h=new Date();
+      marcaEstado('Salvo na nuvem \u00e0s '+String(h.getHours()).padStart(2,'0')+':'+String(h.getMinutes()).padStart(2,'0'));
+    }else{
+      const h=new Date();
+      marcaEstado('Salvo no aparelho \u00e0s '+String(h.getHours()).padStart(2,'0')+':'+String(h.getMinutes()).padStart(2,'0'));
     }
-    const h=new Date();
-    marcaEstado((MODO==='nuvem'?'Salvo na nuvem às ':'Salvo às ')+String(h.getHours()).padStart(2,'0')+':'+String(h.getMinutes()).padStart(2,'0'));
   }catch(e){
-    marcaEstado('Falhou — guardado no aparelho','ruim');
-    erro('Não consegui salvar na nuvem: '+e.message+' Os dados continuam neste aparelho.');
-  }finally{ salvando=false; }
+    marcaEstado('Falhou \u2014 guardado no aparelho','ruim');
+    erro('Nao consegui salvar na nuvem: '+e.message+' Os dados continuam neste aparelho.');
+  }finally{
+    salvando=false;
+    if(pendente){pendente=false;setTimeout(salvarAgora,400)}
+  }
 }
 
 /* ===================== NAVEGAÇÃO ===================== */
@@ -1309,19 +1430,20 @@ $('#btn-copiar-sql').onclick=async()=>{
 };
 $('#btn-sb-salvar').onclick=async()=>{
   const btn=$('#btn-sb-salvar'), url=$('#sb-url').value.trim(), key=$('#sb-key').value.trim();
-  if(!url||!key)return erro('Preencha a URL e a chave anônima.');
-  if(!/^https:\/\/.+/.test(url))return erro('A URL deve começar com https://');
-  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Testando…';
+  if(!url||!key)return erro('Preencha a URL e a chave anonima.');
+  if(!/^https:\/\/.+/.test(url))return erro('A URL deve comecar com https://');
+  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Testando\u2026';
   const antes={url:SB.url,key:SB.key};
   SB.url=url; SB.key=key;
   try{
-    await SB.req('usuarios?select=id&limit=1');
+    const r=await SB.rpc('pauta_ping',{});
+    if(!r||!r.ok)throw new Error('O banco respondeu, mas nao do jeito esperado. Rode o SQL de novo.');
     await local.set(K_SB,{url,key});
     toast('Conectado ao Supabase. Saia e entre de novo para usar a conta na nuvem.');
   }catch(e){
     SB.url=antes.url; SB.key=antes.key;
-    erro('Conexão recusada: '+e.message);
-  }finally{ btn.disabled=false; btn.textContent='Salvar e testar conexão'; pintaConta() }
+    erro('Conexao recusada: '+e.message);
+  }finally{ btn.disabled=false; btn.textContent='Salvar e testar conexao'; pintaConta() }
 };
 $('#btn-sb-limpar').onclick=async()=>{
   if(!confirm('Desconectar do Supabase? O sistema volta a salvar só neste aparelho.'))return;
@@ -1345,13 +1467,27 @@ $('#file-in').onchange=e=>{
     }catch(err){ erro('Esse arquivo não é uma cópia do Pauta.') } };
   r.readAsText(f); e.target.value='';
 };
-$('#btn-limpar').onclick=()=>{
-  if(!confirm('Isso apaga a turma, a frequência, o caderno e as atividades. Tem certeza?'))return;
+$('#btn-limpar').onclick=async()=>{
+  if(!confirm('Isso apaga a turma, a frequencia, o caderno e as atividades. Tem certeza?'))return;
   const m={mesAtivo:S.mesAtivo,mesReg:S.mesReg};
-  S=Object.assign(estadoNovo(),m); S.escola=estadoNovo().escola;
-  salvar(); iniciarTela(); toast('Tudo apagado');
+  S=Object.assign(estadoNovo(),m);
+  try{
+    if(MODO==='nuvem'&&USUARIO&&USUARIO.token) await SB.rpc('pauta_limpar',{p_token:USUARIO.token});
+    await local.set(K_DADOS,S);
+    iniciarTela(); toast('Tudo apagado');
+  }catch(e){ erro('Apaguei neste aparelho, mas nao na nuvem: '+e.message) }
 };
-
+$('#btn-apagar-conta').onclick=async()=>{
+  if(MODO!=='nuvem'||!USUARIO||!USUARIO.token)return erro('So da para apagar a conta quando ela esta na nuvem.');
+  if(!confirm('Isso apaga a CONTA inteira do banco de dados, com todos os diarios. Nao tem volta. Continuar?'))return;
+  if(!confirm('Ultima confirmacao: apagar a conta '+mascaraCel(USUARIO.celular)+' para sempre?'))return;
+  try{
+    await SB.rpc('pauta_apagar_conta',{p_token:USUARIO.token});
+    await local.del(K_SESSAO); USUARIO=null; MODO='local';
+    document.body.classList.add('travado'); $('#login').classList.add('on');
+    pintaConta(); toast('Conta apagada do banco de dados.');
+  }catch(e){ erro('Nao consegui apagar a conta: '+e.message) }
+};
 /* ===================== IMPRESSÃO ===================== */
 function cabecalhoHTML(titulo,extra=''){
   return `<div class="p-cab"><h1>${esc(S.escola.nome)}</h1>
@@ -1421,11 +1557,11 @@ function iniciarTela(){
   if(cfg&&cfg.url){SB.url=cfg.url;SB.key=cfg.key}
   $('#login-pe').innerHTML=SB.pronto()
     ? 'Conectado ao seu banco de dados. <button id="lk-local">Entrar sem conta neste aparelho</button>'
-    : 'Ainda sem banco de dados configurado — você entra em modo local e configura o Supabase depois, em “Escola e conta”.';
+    : 'Ainda sem banco de dados configurado \u2014 voce entra em modo local e configura o Supabase depois, em \u201cEscola e conta\u201d.';
   const lk=document.getElementById('lk-local');
   if(lk)lk.onclick=async()=>{
     const guardado=await local.get(K_DADOS); if(guardado)S=Object.assign(estadoNovo(),guardado);
-    USUARIO={id:'local',nome:'Modo local',celular:''}; MODO='local'; await abrirApp();
+    USUARIO={id:'local',nome:'Modo local',celular:'',token:null}; MODO='local'; await abrirApp();
   };
 
   const sessao=await local.get(K_SESSAO);
@@ -1434,10 +1570,19 @@ function iniciarTela(){
 
   if(sessao&&sessao.id){
     USUARIO=sessao;
-    if(SB.pronto()&&!String(sessao.id).startsWith('local')){
+    if(SB.pronto()&&sessao.token){
       MODO='nuvem';
       try{ await carregarDaNuvem(); }
-      catch(e){ MODO='local'; erro('Não deu para buscar os dados da nuvem: '+e.message+' Usando o que está no aparelho.'); }
+      catch(e){
+        if(/expirou|credencial/i.test(e.message)){
+          await local.del(K_SESSAO); USUARIO=null;
+          document.body.classList.add('travado');
+          aviso($('#login-erro'),esc(e.message),'erro');
+          return;
+        }
+        MODO='local';
+        erro('Nao deu para buscar os dados da nuvem: '+e.message+' Usando o que esta no aparelho.');
+      }
     }else MODO='local';
     await abrirApp();
   }else{
