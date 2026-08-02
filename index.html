@@ -387,7 +387,12 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
             </div>
 
             <div class="card">
-              <div class="card-cab"><h2>2. Imagem da atividade</h2><span class="selo" id="ocr-selo" style="display:none"></span></div>
+              <div class="card-cab"><h2>2. Imagem da atividade</h2><span class="selo" id="ocr-selo" style="display:none"></span>
+                <div class="dir"><select id="ocr-modo" class="btn mini" style="padding:5px 8px" title="Como o leitor enxerga a folha">
+                  <option value="6">Leitura: bloco unico</option>
+                  <option value="4">Leitura: colunas</option>
+                  <option value="3">Leitura: automatica</option>
+                </select></div></div>
               <div class="card-corpo">
                 <div class="solta" id="solta">
                   <div style="font-size:30px">🖼️</div>
@@ -418,8 +423,8 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
               <div class="card-cab"><h2>4. Montagem do PDF</h2></div>
               <div class="card-corpo">
                 <div class="opcoes" style="margin-bottom:16px">
-                  <label><input type="checkbox" class="chk" id="op-texto" checked> Incluir o texto</label>
-                  <label><input type="checkbox" class="chk" id="op-imagem" checked> Anexar a imagem</label>
+                  <label><input type="checkbox" class="chk" id="op-texto" checked> Renderizar texto editado</label>
+                  <label><input type="checkbox" class="chk" id="op-imagem"> Anexar imagem original</label>
                   <label><input type="checkbox" class="chk" id="op-pauta"> Linhas para resposta</label>
                 </div>
                 <div class="cab-previa" id="cab-previa"></div>
@@ -478,8 +483,8 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
           <div class="card-cab"><h2>Conexão com o Supabase</h2><span class="selo" id="sb-estado">Não configurado</span></div>
           <div class="card-corpo">
             <div class="grade g2" style="margin-bottom:16px">
-              <div class="campo"><label>URL do projeto</label><input id="sb-url" placeholder="https://kbienvekhnwnqplwkwrv.supabase.co"></div>
-              <div class="campo"><label>Chave anônima (anon public)</label><input id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaWVudmVraG53bnFwbHdrd3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyOTA0MDMsImV4cCI6MjEwMDg2NjQwM30.G2jo07NWVoNe3BWVd63jr0Pl5Xxfb4izQ12_eRhXbY0"></div>
+              <div class="campo"><label>URL do projeto</label><input id="sb-url" placeholder="https://xxxx.supabase.co"></div>
+              <div class="campo"><label>Chave anônima (anon public)</label><input id="sb-key" placeholder="eyJhbGciOi…"></div>
             </div>
             <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px">
               <button class="btn primario" id="btn-sb-salvar">Salvar e testar conexão</button>
@@ -1200,35 +1205,128 @@ function carregarScript(url,nomeGlobal){
   return carregados[url];
 }
 
+/* -------- preparo da imagem para o OCR -------- */
+// Recorta a moldura, amplia e aumenta o contraste. Sem isso o Tesseract
+// tenta ler a borda da folha e a sombra da foto como se fossem letras.
+function prepararParaOCR(dataUrl){
+  return new Promise((ok,falha)=>{
+    const im=new Image();
+    im.onerror=()=>falha(new Error('Nao consegui preparar a imagem.'));
+    im.onload=()=>{
+      try{
+        const corte=0.025;
+        const sx=Math.round(im.naturalWidth*corte), sy=Math.round(im.naturalHeight*corte);
+        const sw=im.naturalWidth-sx*2, sh=im.naturalHeight-sy*2;
+        const fator=Math.min(3,Math.max(1,1800/sw));
+        const c=document.createElement('canvas');
+        c.width=Math.round(sw*fator); c.height=Math.round(sh*fator);
+        const ctx=c.getContext('2d',{willReadFrequently:true});
+        ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
+        ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+        ctx.drawImage(im,sx,sy,sw,sh,0,0,c.width,c.height);
+
+        const d=ctx.getImageData(0,0,c.width,c.height), px=d.data;
+        let soma=0;
+        for(let i=0;i<px.length;i+=4){
+          const g=0.299*px[i]+0.587*px[i+1]+0.114*px[i+2];
+          px[i]=px[i+1]=px[i+2]=g; soma+=g;
+        }
+        const media=soma/(px.length/4), limite=media*0.86;
+        for(let i=0;i<px.length;i+=4){
+          const g=px[i];
+          const v=g<limite ? Math.max(0,g*0.45) : Math.min(255,150+(g-limite)*1.5);
+          px[i]=px[i+1]=px[i+2]=v;
+        }
+        ctx.putImageData(d,0,0);
+        ok(c.toDataURL('image/png'));
+      }catch(e){ falha(new Error('Falha ao tratar a imagem: '+e.message)); }
+    };
+    im.src=dataUrl;
+  });
+}
+
+/* -------- limpeza do texto lido -------- */
+// Joga fora linhas que sao so ruido de borda e caracteres soltos.
+function limparOCR(bruto){
+  let t=String(bruto||'').replace(/\r/g,'');
+  t=t.replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"')
+     .replace(/[|_~^\\\u00b0\u00ac\u00a6]+/g,' ')
+     .replace(/[\u2014\u2013]{2,}/g,'-');
+  const linhas=t.split('\n').map(l=>l.replace(/[ \t]+/g,' ').trim()).filter(l=>{
+    if(!l)return true;                                        // linha em branco separa paragrafo
+    const uteis=(l.match(/[0-9A-Za-z\u00C0-\u00FF]/g)||[]).length;
+    if(uteis===0)return false;                                // so simbolo: e borda
+    if(l.length<=2&&uteis<=1)return false;                    // letra solta perdida
+    if(uteis/l.length<0.45)return false;                      // linha majoritariamente ruido
+    return true;
+  });
+  return linhas.join('\n')
+    .replace(/\n{3,}/g,'\n\n')
+    .replace(/ +([,.;:!?])/g,'$1')
+    .replace(/([a-z\u00e0-\u00ff])-\n([a-z\u00e0-\u00ff])/g,'$1$2')   // junta palavra partida
+    .trim();
+}
+
 /* -------- OCR -------- */
 let ocrRodando=false;
 async function rodarOCR(){
   if(ocrRodando||!IMG.dataUrl)return;
   const btn=$('#btn-ocr'),prog=$('#ocr-prog'),barra=prog.querySelector('i'),msg=$('#ocr-msg'),selo=$('#ocr-selo');
-  ocrRodando=true; btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Lendo…';
-  prog.style.display='block'; barra.style.width='4%'; msg.textContent='Baixando o leitor de texto…';
+  const modo=$('#ocr-modo')?$('#ocr-modo').value:'6';
+  ocrRodando=true; btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Lendo\u2026';
+  prog.style.display='block'; barra.style.width='4%'; msg.textContent='Tratando a imagem\u2026';
   selo.style.display='inline-flex'; selo.className='selo amarelo'; selo.textContent='OCR em andamento';
   aviso($('#ocr-erro'),'');
+  let worker=null;
   try{
+    const tratada=await prepararParaOCR(IMG.dataUrl);
+    barra.style.width='10%'; msg.textContent='Baixando o leitor de texto\u2026';
     await carregarScript(CDN_TESS,'Tesseract');
-    msg.textContent='Reconhecendo as palavras… isso leva alguns segundos.';
-    const r=await Tesseract.recognize(IMG.dataUrl,'por',{logger:m=>{
-      if(m.status==='recognizing text'){barra.style.width=Math.round(10+m.progress*90)+'%';msg.textContent='Reconhecendo… '+Math.round(m.progress*100)+'%'}
-      else if(m.status){msg.textContent=m.status.replace('loading language traineddata','baixando o idioma português')}
-    }});
-    const texto=(r.data.text||'').replace(/\n{3,}/g,'\n\n').trim();
+
+    const anda=m=>{
+      if(m&&m.status==='recognizing text'){
+        barra.style.width=Math.round(25+m.progress*75)+'%';
+        msg.textContent='Reconhecendo\u2026 '+Math.round(m.progress*100)+'%';
+      }else if(m&&m.status){
+        msg.textContent=String(m.status).replace('loading language traineddata','baixando o idioma portugues');
+      }
+    };
+
+    let bruto='';
+    try{
+      // caminho preferido: worker com PSM ajustado
+      worker=await Tesseract.createWorker('por',1,{logger:anda});
+      await worker.setParameters({
+        tessedit_pageseg_mode: modo,          // 6 = bloco unico | 4 = colunas de texto
+        preserve_interword_spaces: '1',
+        user_defined_dpi: '300'
+      });
+      const r=await worker.recognize(tratada);
+      bruto=r.data.text||'';
+    }catch(eWorker){
+      // versoes antigas da biblioteca nao tem createWorker com esta assinatura
+      msg.textContent='Usando o modo simples de leitura\u2026';
+      const r=await Tesseract.recognize(tratada,'por',{logger:anda});
+      bruto=r.data.text||'';
+    }
+
+    const texto=limparOCR(bruto);
     if(!texto){
-      aviso($('#ocr-erro'),'Não encontrei texto legível nessa imagem. Se for um desenho ou traçado, siga direto para o PDF anexando a imagem — ou escreva o enunciado à mão no campo de texto.','erro');
+      aviso($('#ocr-erro'),'Nao encontrei texto legivel nessa imagem. Se for desenho ou tracado, marque <b>Anexar imagem original</b> e siga direto para o PDF \u2014 ou escreva o enunciado a mao no campo ao lado.','erro');
+      selo.className='selo vermelho'; selo.textContent='Sem texto legivel';
     }else{
       const ta=$('#ativ-texto');
       ta.value = ta.value.trim() ? ta.value.trim()+'\n\n'+texto : texto;
-      contarTexto(); toast('Texto extraído. Confira e corrija o que o leitor errou.');
+      contarTexto();
+      const cortadas=String(bruto).split('\n').filter(Boolean).length-texto.split('\n').filter(Boolean).length;
+      toast('Texto extraido'+(cortadas>0?` (${cortadas} linhas de ruido descartadas)`:'')+'. Confira e corrija.');
+      selo.className='selo verde'; selo.textContent='Leitura concluida';
     }
-    selo.className='selo verde'; selo.textContent='Leitura concluída';
   }catch(e){
     selo.className='selo vermelho'; selo.textContent='Falhou';
-    aviso($('#ocr-erro'),'<b>A leitura automática não funcionou:</b> '+esc(e.message)+' Você ainda pode anexar a imagem no PDF e digitar o texto à mão.','erro');
+    aviso($('#ocr-erro'),'<b>A leitura automatica nao funcionou:</b> '+esc(e.message)+' Voce ainda pode anexar a imagem no PDF e digitar o texto a mao.','erro');
   }finally{
+    if(worker){ try{ await worker.terminate(); }catch(e){} }
     ocrRodando=false; btn.disabled=false; btn.textContent='Ler o texto da imagem';
     setTimeout(()=>{prog.style.display='none'},900);
   }
@@ -1242,6 +1340,7 @@ $('#ativ-texto').addEventListener('input',contarTexto);
 $('#btn-limpar-txt').onclick=()=>{$('#ativ-texto').value='';contarTexto()};
 
 /* -------- PDF -------- */
+const A4={l:595.28,a:841.89}, MARGEM=40;
 const limparWinAnsi=t=>String(t||'').replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"')
   .replace(/[\u2013\u2014]/g,'-').replace(/\u2026/g,'...').replace(/[^\x00-\xFF]/g,'');
 
@@ -1252,8 +1351,18 @@ function quebrar(texto,fonte,tam,larg){
     let linha='';
     par.split(/\s+/).forEach(p=>{
       const teste=linha?linha+' '+p:p;
-      if(fonte.widthOfTextAtSize(teste,tam)>larg){ if(linha)saida.push(linha); linha=p; }
-      else linha=teste;
+      if(fonte.widthOfTextAtSize(teste,tam)>larg){
+        if(linha)saida.push(linha);
+        // palavra sozinha maior que a linha: parte no meio
+        if(fonte.widthOfTextAtSize(p,tam)>larg){
+          let pedaco='';
+          for(const ch of p){
+            if(fonte.widthOfTextAtSize(pedaco+ch,tam)>larg){saida.push(pedaco);pedaco=ch}
+            else pedaco+=ch;
+          }
+          linha=pedaco;
+        }else linha=p;
+      }else linha=teste;
     });
     if(linha)saida.push(linha);
   });
@@ -1263,121 +1372,144 @@ async function imagemParaPng(dataUrl){
   return new Promise((ok,falha)=>{
     const im=new Image();
     im.onload=()=>{
-      const max=1500,esc2=Math.min(1,max/Math.max(im.width,im.height));
+      const max=1600,f=Math.min(1,max/Math.max(im.naturalWidth,im.naturalHeight));
       const c=document.createElement('canvas');
-      c.width=Math.round(im.width*esc2); c.height=Math.round(im.height*esc2);
-      const ctx=c.getContext('2d'); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
+      c.width=Math.round(im.naturalWidth*f); c.height=Math.round(im.naturalHeight*f);
+      const ctx=c.getContext('2d');
+      ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
       ctx.drawImage(im,0,0,c.width,c.height);
-      c.toBlob(b=>b?b.arrayBuffer().then(ok):falha(new Error('Não consegui converter a imagem.')),'image/png');
+      c.toBlob(b=>b?b.arrayBuffer().then(ok):falha(new Error('Nao consegui converter a imagem.')),'image/png');
     };
-    im.onerror=()=>falha(new Error('Não consegui abrir a imagem para o PDF.'));
+    im.onerror=()=>falha(new Error('Nao consegui abrir a imagem para o PDF.'));
     im.src=dataUrl;
   });
 }
+
+// Desenha o cabecalho no topo da pagina e devolve o Y onde o conteudo comeca.
+function desenharCabecalho(pg,h,nome,F,rgb){
+  const LARG=A4.l-MARGEM*2, topo=A4.a-MARGEM;
+  const tinta=rgb(0.086,0.196,0.310), suave=rgb(0.38,0.47,0.55), risco=rgb(.80,.86,.91);
+  const linhas=[['SALA:',h.sala,'CRECHE:',h.creche],['PROFESSOR(A):',h.prof],
+                ['ASSISTENTES:',h.assist],['ANO LETIVO:',h.ano]];
+  const alt=34+linhas.length*17+36;
+  pg.drawRectangle({x:MARGEM,y:topo-alt,width:LARG,height:alt,borderColor:tinta,borderWidth:1.4,color:rgb(1,1,1)});
+
+  let y=topo-20;
+  const t1=limparWinAnsi((h.escola||'').toUpperCase());
+  if(t1)pg.drawText(t1,{x:MARGEM+(LARG-F.b.widthOfTextAtSize(t1,12))/2,y,size:12,font:F.b,color:tinta});
+  y-=15;
+  if(h.titulo){
+    const t2=limparWinAnsi(h.titulo);
+    pg.drawText(t2,{x:MARGEM+(LARG-F.n.widthOfTextAtSize(t2,8.5))/2,y,size:8.5,font:F.n,color:suave});
+  }
+  y-=14;
+  linhas.forEach(l=>{
+    let x=MARGEM+12;
+    pg.drawText(limparWinAnsi(l[0]),{x,y,size:8,font:F.b,color:suave});
+    x+=F.b.widthOfTextAtSize(l[0],8)+5;
+    pg.drawText(limparWinAnsi(l[1]||''),{x,y,size:9.5,font:F.n,color:tinta});
+    if(l[2]){
+      x=MARGEM+LARG/2+30;
+      pg.drawText(limparWinAnsi(l[2]),{x,y,size:8,font:F.b,color:suave});
+      x+=F.b.widthOfTextAtSize(l[2],8)+5;
+      pg.drawText(limparWinAnsi(l[3]||''),{x,y,size:9.5,font:F.n,color:tinta});
+    }
+    pg.drawLine({start:{x:MARGEM+12,y:y-4},end:{x:MARGEM+LARG-12,y:y-4},thickness:.4,color:risco});
+    y-=17;
+  });
+  const cy=topo-alt+9;
+  pg.drawRectangle({x:MARGEM+12,y:cy,width:LARG-24,height:25,borderColor:tinta,borderWidth:1});
+  pg.drawText('NOME DA CRIANCA:',{x:MARGEM+18,y:cy+9.5,size:7.5,font:F.b,color:suave});
+  pg.drawText(limparWinAnsi(nome),{x:MARGEM+120,y:cy+8.5,size:11,font:F.b,color:tinta});
+  return topo-alt-24;
+}
+
 async function gerarPDF(){
-  const btn=$('#btn-pdf'); const h=H();
+  const btn=$('#btn-pdf'), h=H();
   const texto=$('#ativ-texto').value.trim();
-  const usarTexto=$('#op-texto').checked, usarImagem=$('#op-imagem').checked&&!!IMG.dataUrl, usarPauta=$('#op-pauta').checked;
-  if(!usarTexto&&!usarImagem&&!usarPauta) return erro('Marque pelo menos uma coisa para entrar na folha: texto, imagem ou linhas.');
-  if(usarTexto&&!texto&&!usarImagem&&!usarPauta) return erro('O texto está vazio. Escreva algo ou anexe a imagem.');
-  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Montando…';
+  const usarTexto=$('#op-texto').checked;
+  const usarImagem=$('#op-imagem').checked;
+  const usarPauta=$('#op-pauta').checked;
+
+  if(usarImagem&&!IMG.dataUrl)
+    return erro('Voce marcou anexar a imagem original, mas nenhuma imagem foi enviada.');
+  if(!usarTexto&&!usarImagem&&!usarPauta)
+    return erro('Marque pelo menos uma coisa para entrar na folha: texto, imagem ou linhas.');
+  if(usarTexto&&!texto&&!usarImagem&&!usarPauta)
+    return erro('O campo de texto esta vazio. Escreva algo, anexe a imagem ou marque as linhas de resposta.');
+
+  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Montando\u2026';
   try{
     await carregarScript(CDN_PDF,'PDFLib');
     const {PDFDocument,StandardFonts,rgb}=PDFLib;
     const doc=await PDFDocument.create();
-    const negrito=await doc.embedFont(StandardFonts.HelveticaBold);
-    const normal=await doc.embedFont(StandardFonts.Helvetica);
-    let png=null;
-    if(usarImagem){ png=await doc.embedPng(await imagemParaPng(IMG.dataUrl)); }
+    const F={b:await doc.embedFont(StandardFonts.HelveticaBold),n:await doc.embedFont(StandardFonts.Helvetica)};
+    const png=usarImagem?await doc.embedPng(await imagemParaPng(IMG.dataUrl)):null;
 
-    const nomes = h.crianca==='__todos__'
-      ? (S.alunos.filter(a=>a.nome).map(a=>a.nome).length?S.alunos.filter(a=>a.nome).map(a=>a.nome):[''])
-      : [h.crianca||''];
+    const comNome=S.alunos.filter(a=>a.nome).map(a=>a.nome);
+    const nomes = h.crianca==='__todos__' ? (comNome.length?comNome:['']) : [h.crianca||''];
 
-    const A4=[595.28,841.89], M=40, LARG=A4[0]-M*2;
-    const tintaRGB=rgb(0.086,0.196,0.310), suaveRGB=rgb(0.38,0.47,0.55);
+    const LARG=A4.l-MARGEM*2;
+    const suave=rgb(0.38,0.47,0.55);
+    const TAM=12, ENTRE=19;
 
     for(const nome of nomes){
-      let pg=doc.addPage(A4);
-      let y=A4[1]-M;
+      let pg=doc.addPage([A4.l,A4.a]);
+      let y=desenharCabecalho(pg,h,nome,F,rgb);
 
-      /* --- retângulo do cabeçalho --- */
-      const linhasCab=[
-        ['SALA:',h.sala,'CRECHE:',h.creche],
-        ['PROFESSOR(A):',h.prof],
-        ['ASSISTENTES:',h.assist],
-        ['ANO LETIVO:',h.ano]
-      ];
-      const altCab=34+linhasCab.length*17+34;
-      pg.drawRectangle({x:M,y:y-altCab,width:LARG,height:altCab,borderColor:tintaRGB,borderWidth:1.4,color:rgb(1,1,1)});
-      let yy=y-20;
-      const titulo=limparWinAnsi((h.escola||'').toUpperCase());
-      pg.drawText(titulo,{x:M+(LARG-negrito.widthOfTextAtSize(titulo,12))/2,y:yy,size:12,font:negrito,color:tintaRGB});
-      yy-=15;
-      if(h.titulo){
-        const t2=limparWinAnsi(h.titulo);
-        pg.drawText(t2,{x:M+(LARG-normal.widthOfTextAtSize(t2,8.5))/2,y:yy,size:8.5,font:normal,color:suaveRGB});
-      }
-      yy-=14;
-      linhasCab.forEach(l=>{
-        let x=M+12;
-        pg.drawText(limparWinAnsi(l[0]),{x,y:yy,size:8,font:negrito,color:suaveRGB});
-        x+=negrito.widthOfTextAtSize(l[0],8)+5;
-        pg.drawText(limparWinAnsi(l[1]||''),{x,y:yy,size:9.5,font:normal,color:tintaRGB});
-        if(l[2]){
-          x=M+LARG/2+30;
-          pg.drawText(limparWinAnsi(l[2]),{x,y:yy,size:8,font:negrito,color:suaveRGB});
-          x+=negrito.widthOfTextAtSize(l[2],8)+5;
-          pg.drawText(limparWinAnsi(l[3]||''),{x,y:yy,size:9.5,font:normal,color:tintaRGB});
-        }
-        pg.drawLine({start:{x:M+12,y:yy-4},end:{x:M+LARG-12,y:yy-4},thickness:.4,color:rgb(.80,.86,.91)});
-        yy-=17;
-      });
-      /* caixa do nome da criança */
-      const caixaY=y-altCab+8;
-      pg.drawRectangle({x:M+12,y:caixaY,width:LARG-24,height:24,borderColor:tintaRGB,borderWidth:1});
-      pg.drawText('NOME DA CRIANCA:',{x:M+18,y:caixaY+9,size:7.5,font:negrito,color:suaveRGB});
-      pg.drawText(limparWinAnsi(nome),{x:M+118,y:caixaY+8,size:11,font:negrito,color:tintaRGB});
-      y=y-altCab-22;
+      const novaPagina=()=>{
+        pg=doc.addPage([A4.l,A4.a]);
+        const cont=limparWinAnsi((nome?nome+' \u2014 ':'')+'continuacao');
+        pg.drawText(cont,{x:MARGEM,y:A4.a-MARGEM-8,size:8,font:F.n,color:suave});
+        y=A4.a-MARGEM-26;
+        return pg;
+      };
 
-      /* --- conteúdo --- */
+      /* --- texto editado no textarea --- */
       if(usarTexto&&texto){
-        const linhas=quebrar(limparWinAnsi(texto),normal,11.5,LARG-8);
+        const linhas=quebrar(limparWinAnsi(texto),F.n,TAM,LARG-8);
         for(const ln of linhas){
-          if(y<M+40){pg=doc.addPage(A4);y=A4[1]-M}
-          if(ln)pg.drawText(ln,{x:M+4,y,size:11.5,font:normal,color:rgb(.07,.13,.18)});
-          y-=19;
+          if(y-ENTRE<MARGEM+20)novaPagina();
+          if(ln)pg.drawText(ln,{x:MARGEM+4,y,size:TAM,font:F.n,color:rgb(.07,.13,.18)});
+          y-=ENTRE;
         }
-        y-=10;
+        y-=14;
       }
+
+      /* --- imagem original, enquadrada no espaco que sobrou --- */
       if(usarImagem&&png){
-        const dispon=y-M-(usarPauta?120:0);
-        const escala=Math.min(LARG/png.width,(dispon>140?dispon:A4[1]-M*2)/png.height,1);
-        let lp=png.width*escala, ap=png.height*escala;
-        if(ap>y-M){ pg=doc.addPage(A4); y=A4[1]-M;
-          const e2=Math.min(LARG/png.width,(y-M)/png.height,1); lp=png.width*e2; ap=png.height*e2; }
-        pg.drawImage(png,{x:M+(LARG-lp)/2,y:y-ap,width:lp,height:ap});
-        y-=ap+18;
+        const reservaPauta=usarPauta?150:0;
+        let sobra=y-MARGEM-reservaPauta;
+        if(sobra<160){ novaPagina(); sobra=y-MARGEM-reservaPauta; }
+        const cx=png.scaleToFit(LARG,Math.max(80,sobra));
+        pg.drawImage(png,{x:MARGEM+(LARG-cx.width)/2, y:y-cx.height, width:cx.width, height:cx.height});
+        y-=cx.height+18;
       }
+
+      /* --- linhas para a resposta --- */
       if(usarPauta){
-        if(y<M+80){pg=doc.addPage(A4);y=A4[1]-M}
-        while(y>M+24){
-          pg.drawLine({start:{x:M+4,y},end:{x:M+LARG-4,y},thickness:.7,color:rgb(.75,.84,.92)});
+        if(y-56<MARGEM)novaPagina();
+        while(y>MARGEM+26){
+          pg.drawLine({start:{x:MARGEM+4,y},end:{x:MARGEM+LARG-4,y},thickness:.7,color:rgb(.75,.84,.92)});
           y-=28;
         }
       }
-      pg.drawText(limparWinAnsi(new Date().toLocaleDateString('pt-BR')),{x:A4[0]-M-58,y:22,size:8,font:normal,color:suaveRGB});
+
+      const data=limparWinAnsi(new Date().toLocaleDateString('pt-BR'));
+      pg.drawText(data,{x:A4.l-MARGEM-F.n.widthOfTextAtSize(data,8),y:22,size:8,font:F.n,color:suave});
     }
 
     const bytes=await doc.save();
-    const blob=new Blob([bytes],{type:'application/pdf'});
     const a=document.createElement('a');
-    const rot=(h.titulo||'atividade').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-    a.href=URL.createObjectURL(blob); a.download=`${rot||'atividade'}.pdf`; a.click();
+    const rot=(h.titulo||'atividade').toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    a.href=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+    a.download=(rot||'atividade')+'.pdf'; a.click();
     setTimeout(()=>URL.revokeObjectURL(a.href),4000);
     toast(nomes.length>1?`PDF gerado com ${nomes.length} folhas.`:'PDF gerado.');
   }catch(e){
-    erro('Não consegui gerar o PDF: '+e.message);
+    erro('Nao consegui gerar o PDF: '+e.message);
   }finally{
     btn.disabled=false; btn.textContent='Gerar PDF';
   }
