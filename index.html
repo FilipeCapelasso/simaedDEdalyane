@@ -482,6 +482,7 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
         <div class="card" style="margin-bottom:18px">
           <div class="card-cab"><h2>Conexão com o Supabase</h2><span class="selo" id="sb-estado">Não configurado</span></div>
           <div class="card-corpo">
+            <p id="sb-origem" style="margin:0 0 16px;font-size:13px;color:var(--suave)"></p>
             <div class="grade g2" style="margin-bottom:16px">
               <div class="campo"><label>URL do projeto</label><input id="sb-url" placeholder="https://kbienvekhnwnqplwkwrv.supabase.co"></div>
               <div class="campo"><label>Chave anônima (anon public)</label><input id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaWVudmVraG53bnFwbHdrd3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyOTA0MDMsImV4cCI6MjEwMDg2NjQwM30.G2jo07NWVoNe3BWVd63jr0Pl5Xxfb4izQ12_eRhXbY0"></div>
@@ -522,6 +523,23 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
 
 <script>
 /* ===================== CONSTANTES ===================== */
+/* ============================================================================
+   CONFIGURACAO AUTOMATICA  -  preencha as duas linhas abaixo UMA VEZ e pronto:
+   ninguem mais vai ver a tela de configuracao nem a mensagem de modo local.
+
+   Onde achar: painel do Supabase > Project Settings > Data API
+     URL   = "Project URL"        (ex.: https://abcdefgh.supabase.co)
+     CHAVE = "anon public"        (a chave longa que comeca com eyJ...)
+
+   Pode deixar a chave aqui dentro: ela e publica por natureza, e o script SQL
+   deste projeto tranca as tabelas para que a chave sozinha nao leia nada.
+   NUNCA coloque aqui a chave "service_role" - essa sim da acesso total.
+============================================================================ */
+const SUPABASE_PADRAO={
+  url:'',
+  key:''
+};
+
 const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const SEM=['D','S','T','Q','Q','S','S'];
 const CICLO=['','P','F','J','A'], SIMB={'':'','P':'•','F':'F','J':'J','A':'A'};
@@ -780,7 +798,7 @@ async function autenticar(){
   if(!SB.pronto()){
     USUARIO={id:'local-'+cel,nome,celular:cel,token:null}; MODO='local';
     await local.set(K_SESSAO,USUARIO); await abrirApp();
-    return toast('Entrou no modo local. Configure o Supabase em \u201cEscola e conta\u201d para salvar na nuvem.');
+    return toast('Pronto! Seus dados est\u00e3o sendo salvos neste aparelho.');
   }
   btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Entrando\u2026';
   try{
@@ -1555,6 +1573,11 @@ function config(){
     el.oninput=()=>{S.escola[ch]=el.value;salvar();capas()};
   });
   $('#sb-url').value=SB.url; $('#sb-key').value=SB.key; $('#sql-txt').textContent=SQL;
+  const embutido=!!(SUPABASE_PADRAO.url&&SUPABASE_PADRAO.key);
+  const nota=$('#sb-origem');
+  if(nota) nota.innerHTML = embutido
+    ? 'Conex\u00e3o j\u00e1 vem configurada dentro do arquivo \u2014 n\u00e3o precisa mexer aqui.'
+    : 'Sem conex\u00e3o configurada. Preencha abaixo, ou deixe as credenciais fixas no in\u00edcio do arquivo (bloco <b>SUPABASE_PADRAO</b>) para nunca mais ver esta tela.';
 }
 $('#btn-sb-sql').onclick=()=>{const c=$('#sql-cx');c.style.display=c.style.display==='none'?'block':'none'};
 $('#btn-copiar-sql').onclick=async()=>{
@@ -1686,10 +1709,14 @@ function iniciarTela(){
 }
 (async()=>{
   const cfg=await local.get(K_SB);
-  if(cfg&&cfg.url){SB.url=cfg.url;SB.key=cfg.key}
+  if(cfg&&cfg.url){ SB.url=cfg.url; SB.key=cfg.key; }
+  else if(SUPABASE_PADRAO.url&&SUPABASE_PADRAO.key){
+    SB.url=SUPABASE_PADRAO.url.trim(); SB.key=SUPABASE_PADRAO.key.trim();
+    await local.set(K_SB,{url:SB.url,key:SB.key});
+  }
   $('#login-pe').innerHTML=SB.pronto()
     ? 'Conectado ao seu banco de dados. <button id="lk-local">Entrar sem conta neste aparelho</button>'
-    : 'Ainda sem banco de dados configurado \u2014 voce entra em modo local e configura o Supabase depois, em \u201cEscola e conta\u201d.';
+    : 'Seus dados ficam salvos neste aparelho. Para acessar de outros celulares, configure o banco em \u201cEscola e conta\u201d.';
   const lk=document.getElementById('lk-local');
   if(lk)lk.onclick=async()=>{
     const guardado=await local.get(K_DADOS); if(guardado)S=Object.assign(estadoNovo(),guardado);
