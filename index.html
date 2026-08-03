@@ -441,14 +441,6 @@ body.compacta .conta{justify-content:center;padding:9px 0}
             <div class="card-corpo" id="alerta-faltas"></div></div>
         </div>
         <div style="height:18px"></div>
-        <div class="card">
-          <div class="card-cab"><h2>Calendário do mês</h2><span class="selo" id="cal-selo">—</span>
-            <div class="dir"><span class="selo verde">verde = todos vieram</span><span class="selo vermelho">vermelho = teve falta</span></div></div>
-          <div class="card-corpo"><div class="cal" id="cal-painel"></div>
-            <p style="margin:14px 0 0;font-size:12.5px;color:var(--suave)">Toque em um dia para abrir a frequência dele.</p></div>
-        </div>
-
-        <div style="height:18px"></div>
         <div class="card"><div class="card-cab"><h2>Últimas atividades escritas</h2><button class="btn mini" data-ir="registro">Abrir caderno</button></div>
           <div class="card-corpo" id="ultimos"></div></div>
       </section>
@@ -1251,7 +1243,6 @@ function painel(){
       <span style="font-weight:500">${esc(x.a.nome)||'sem nome'}</span>
       <span class="selo vermelho" style="margin-left:auto">${x.f} faltas</span></div>`));
 
-  calendarioDoPainel();
   const u=$('#ultimos'),regs=(S.reg[S.mesReg]||[]).filter(e=>(e.texto||'').trim()).slice(-4).reverse();
   u.innerHTML=regs.length?'':`<div style="color:var(--suave);font-size:13.5px">Nada escrito ainda neste mês.</div>`;
   regs.forEach(e=>u.insertAdjacentHTML('beforeend',
@@ -1719,25 +1710,6 @@ function montaCalendario(alvo,k,pinta,aoClicar){
     c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ir()}};
   });
 }
-function calendarioDoPainel(){
-  const k=S.mesAtivo, fx=marcasMes(k), total=S.alunos.length;
-  const selo=$('#cal-selo'); if(selo)selo.textContent=rotuloMes(k);
-  montaCalendario('#cal-painel',k,d=>{
-    let p=0,f=0,marcados=0;
-    S.alunos.forEach(a=>{const v=(fx[a.id]||{})[d]; if(!v)return; marcados++;
-      if(v==='P'||v==='A')p++; else if(v==='F')f++;});
-    if(!marcados)return {};
-    return {cls:f?'f':'p', base:`${p}/${total||marcados}`, barra:Math.max(.25,p/(total||marcados))};
-  },d=>{ ir('frequencia');
-    setTimeout(()=>{
-      const alvo=$(`#tab-freq th.dia[data-d="${d}"]`);
-      if(alvo){alvo.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
-        alvo.style.transition='background .3s'; alvo.style.background='#FDF3DC';
-        setTimeout(()=>{alvo.style.background=''},1400);}
-    },260);
-  });
-}
-
 /* ===================== RELATÓRIOS ===================== */
 let relSelecionado=null;
 function resumoDoAluno(id,k){
