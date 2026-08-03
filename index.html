@@ -333,6 +333,49 @@ body.compacta .conta{justify-content:center;padding:9px 0}
 .num{font-family:var(--mono);font-weight:600}
 @media(max-width:880px){.esconde-mob{display:none}}
 
+
+/* ================= v8 · APROVEITAR A TELA INTEIRA ================= */
+.main{display:flex;flex-direction:column;min-height:100dvh}
+.wrap{flex:1 1 auto}
+
+@media (min-width:1100px){
+  .wrap{max-width:none}                       /* sem coluna estreita no meio da tela */
+  .col-nome{min-width:clamp(210px,17vw,430px)}
+  table.freq{width:100%;table-layout:auto}
+  table.freq thead th.dia{width:auto;min-width:30px}
+  table.freq td .cel{width:100%;min-width:26px}
+  .tot{width:auto;min-width:52px}
+  .freq-caixa{min-height:calc(100dvh - 330px);max-height:none}
+  .caderno,.card{width:100%}
+  .folha{min-height:calc(100dvh - 420px)}
+}
+
+/* monitores grandes: tudo cresce junto, sem virar deserto branco */
+@media (min-width:1700px){
+  body{font-size:16px}
+  :root{--gutter:clamp(28px,2.6vw,56px)}
+  .topo h1{font-size:clamp(26px,1.8vw,36px)}
+  .topo p{font-size:15px}
+  .metrica{padding:22px 26px}
+  .metrica .n{font-size:clamp(34px,2.5vw,46px)}
+  .metrica .r{font-size:12px}
+  .card-cab{padding:18px 24px}
+  .card-cab h2{font-size:19px}
+  .card-corpo{padding:24px}
+  table.freq{font-size:13.5px}
+  table.freq thead th{height:50px;font-size:11.5px}
+  table.freq td .cel{height:36px;font-size:14.5px}
+  .barras{height:170px}
+  .rel-tab td{padding:12px}
+  .cal .dia{aspect-ratio:1/.72}
+}
+@media (min-width:2200px){
+  body{font-size:17px}
+  .metricas{grid-template-columns:repeat(4,1fr)}
+  table.freq td .cel{height:40px}
+  .freq-caixa{min-height:calc(100dvh - 360px)}
+}
+
 /* ============ IMPRESSÃO ============ */
 .papel-print{display:none}
 @media print{
