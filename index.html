@@ -223,11 +223,121 @@ body.fonte-formal .pauta-area,body.fonte-formal .data-in{font-family:var(--body)
 .chk{width:16px;height:16px;accent-color:var(--tinta)}
 pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-family:var(--mono);font-size:11.5px;overflow:auto;line-height:1.65;max-height:290px;margin:0}
 
+
+/* ================= v6 · OCUPA A TELA TODA E SE AJUSTA ================= */
+:root{--lateral:clamp(232px,17vw,300px);--gutter:clamp(14px,2.2vw,34px)}
+html{-webkit-text-size-adjust:100%}
+body{min-height:100dvh}
+.app{grid-template-columns:var(--lateral) 1fr;min-height:100dvh}
+.wrap{padding:var(--gutter);max-width:1720px;margin:0 inherit;width:100%}
+.topo{padding:clamp(14px,1.6vw,20px) var(--gutter)}
+.topo h1{font-size:clamp(21px,2.1vw,28px)}
+.metricas{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))}
+.capas{grid-template-columns:repeat(auto-fill,minmax(min(100%,262px),1fr))}
+.freq-caixa{max-height:min(74vh,760px)}
+.menu-btn,.tabs,.veu{display:none}
+
+/* menu lateral recolhido (telas de notebook pequenas) */
+body.compacta{--lateral:78px}
+body.compacta .marca-nome,body.compacta .marca-sub,body.compacta .nav-tit,
+body.compacta .rot,body.compacta .conta div,body.compacta .conta button,
+body.compacta #modo-txt,body.compacta #salvo-txt{display:none}
+body.compacta .nav-item{justify-content:center;padding:12px 0}
+body.compacta .marca{justify-content:center;padding-left:0;padding-right:0}
+body.compacta .conta{justify-content:center;padding:9px 0}
+.btn-recolher{background:none;border:0;color:#7FA5C4;cursor:pointer;font-size:11.5px;padding:10px 10px 0;text-align:left;display:flex;gap:8px;align-items:center}
+.btn-recolher:hover{color:#fff}
+
+/* ---------- celular e tablet ---------- */
+@media (max-width:880px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:min(84vw,300px);z-index:120;
+        transform:translateX(-102%);transition:transform .28s cubic-bezier(.2,.8,.2,1);height:100dvh;
+        box-shadow:0 0 60px rgba(0,0,0,.4)}
+  body.menu-aberto .side{transform:none}
+  .veu{display:block;position:fixed;inset:0;background:rgba(10,25,40,.5);z-index:110;opacity:0;
+       pointer-events:none;transition:opacity .25s}
+  body.menu-aberto .veu{opacity:1;pointer-events:auto}
+  .menu-btn{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;padding:0;font-size:19px}
+  .topo{padding:12px 16px;align-items:center}
+  .topo h1{font-size:19px}
+  .topo p{display:none}
+  .topo-acoes{width:100%;margin-left:0;order:3}
+  .topo-acoes .btn{flex:1;justify-content:center}
+  .main{padding-bottom:86px}
+  .tabs{display:grid;grid-template-columns:repeat(5,1fr);position:fixed;left:0;right:0;bottom:0;z-index:100;
+        background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-top:1px solid var(--borda);
+        padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+  .tab-item{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:3px;
+            padding:7px 2px;border-radius:11px;color:var(--suave);font-size:9.5px;font-weight:700;cursor:pointer}
+  .tab-item svg{width:21px;height:21px}
+  .tab-item.on{color:var(--tinta);background:var(--papel-2)}
+  .card-cab{padding:14px 15px}.card-corpo{padding:15px}
+  .card-cab .dir{width:100%;margin-left:0}
+  .card-cab .dir .btn{flex:1;justify-content:center}
+  .col-nome{min-width:150px}
+  .folha{padding:0 12px 18px}.folha::before{left:64px}
+  .entrada{grid-template-columns:60px 1fr}
+  .pauta-area{font-size:19px;padding:0 6px}
+  .metricas{grid-template-columns:repeat(2,1fr);gap:11px}
+  .metrica{padding:14px 15px}.metrica .n{font-size:26px}
+  .login-corpo{padding:20px 20px 24px}.login-topo{padding:22px 20px 18px}
+}
+@media (max-width:420px){
+  .metricas{grid-template-columns:1fr}
+  .tab-item{font-size:9px}
+}
+/* ---------- telas grandes ---------- */
+@media (min-width:1800px){
+  .wrap{max-width:1860px}
+  .metricas{grid-template-columns:repeat(4,1fr)}
+}
+
+/* ================= v6 · CALENDÁRIO ================= */
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:clamp(4px,.5vw,7px)}
+.cal .cabc{font-size:10px;text-transform:uppercase;letter-spacing:.09em;color:var(--suave);
+           text-align:center;font-weight:700;padding-bottom:2px}
+.cal .dia{aspect-ratio:1/.86;border-radius:10px;border:1px solid var(--borda);background:#fff;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+          font-family:var(--mono);position:relative;transition:transform .12s}
+.cal .dia b{font-size:clamp(11px,1vw,14px);font-weight:600}
+.cal .dia small{font-size:9px;color:var(--suave);line-height:1}
+.cal .dia.vazia{border:0;background:none}
+.cal .dia.fds{background:#FAFAFC;color:var(--lilas)}
+.cal .dia.off{background:#F1F3F5;color:#A9B7C4}
+.cal .dia.off b{text-decoration:line-through}
+.cal .dia.p{background:#E4F3EC;border-color:#B7DFC9;color:var(--quadro)}
+.cal .dia.f{background:#FBEAE5;border-color:#F0BFB2;color:var(--carimbo)}
+.cal .dia.j{background:#FDF6E3;border-color:#EFD9A6;color:#8A6410}
+.cal .dia.a{background:#F1EEF9;border-color:#CFC6E6;color:var(--lilas)}
+.cal .dia.hoje{outline:2px solid var(--lapis);outline-offset:1px}
+.cal .dia.clicavel{cursor:pointer}
+.cal .dia.clicavel:hover{transform:translateY(-2px);box-shadow:var(--sombra)}
+.cal .dia i{position:absolute;left:6px;right:6px;bottom:5px;height:3px;border-radius:2px;background:var(--tinta-2);opacity:.85}
+
+/* ================= v6 · RELATÓRIOS ================= */
+.rel-tab{width:100%;border-collapse:collapse}
+.rel-tab th{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--suave);
+            text-align:left;padding:9px 10px;border-bottom:1px solid var(--borda);white-space:nowrap}
+.rel-tab td{padding:9px 10px;border-bottom:1px solid #EDF2F7;vertical-align:middle}
+.rel-tab tbody tr{cursor:pointer;transition:background .12s}
+.rel-tab tbody tr:hover{background:#F5FAFD}
+.rel-tab tbody tr.sel{background:#EAF4FC;box-shadow:inset 3px 0 0 var(--tinta-2)}
+.trilho{height:8px;border-radius:99px;background:#E9EFF5;overflow:hidden;min-width:80px}
+.trilho i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--quadro),#63B48F);transition:width .5s}
+.trilho i.baixa{background:linear-gradient(90deg,var(--carimbo),#EE8A6C)}
+.trilho i.media{background:linear-gradient(90deg,#C08A1E,var(--lapis))}
+.num{font-family:var(--mono);font-weight:600}
+@media(max-width:880px){.esconde-mob{display:none}}
+
 /* ============ IMPRESSÃO ============ */
 .papel-print{display:none}
 @media print{
   body{background:#fff}
-  .side,.topo,.wrap,.toast,.tela-login,.no-print{display:none!important}
+  .side,.topo,.wrap,.toast,.tela-login,.tabs,.veu,.menu-btn,.no-print{display:none!important}
   .app{display:block;filter:none}
   .papel-print{display:block;color:#000}
   .p-bloco{page-break-after:always}
@@ -273,6 +383,7 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
   </div>
 </div>
 
+<div class="veu no-print" id="veu"></div>
 <div class="app">
   <aside class="side">
     <div class="marca">
@@ -288,9 +399,13 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
 
     <div class="nav-tit">Turma</div>
     <button class="nav-item" data-ir="alunos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M17 8.5a3 3 0 0 1 0 5M18 20c0-2.4-.9-4.2-2.3-5.3"/></svg>Alunos</button>
+    <button class="nav-item" data-ir="relatorios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 21V9M12 21V4M19 21v-7"/><path d="M3 21h18"/></svg>Relatórios</button>
     <button class="nav-item" data-ir="capas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h4"/></svg>Capas e fichas</button>
     <button class="nav-item" data-ir="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-2.7 1.1 2 2 0 1 1-4 0 1.6 1.6 0 0 0-2.7-1.1l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.6 1.6 0 0 0 3 15a2 2 0 1 1 0-4 1.6 1.6 0 0 0 1.1-2.7l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.6 1.6 0 0 0 9.6 4.4a2 2 0 1 1 4 0 1.6 1.6 0 0 0 2.7 1.1l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.6 1.6 0 0 0 21 11a2 2 0 1 1 0 4Z"/></svg>Escola e conta</button>
 
+    <button class="btn-recolher no-print" id="btn-recolher" title="Recolher o menu">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+      <span class="rot">Recolher menu</span></button>
     <div class="side-pe">
       <div class="conta" id="conta-cx" style="display:none">
         <div class="av" id="conta-av">?</div>
@@ -304,6 +419,7 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
 
   <main class="main">
     <header class="topo">
+      <button class="btn menu-btn no-print" id="btn-menu" aria-label="Abrir menu">&#9776;</button>
       <div><h1 id="tit">Painel</h1><p id="sub">Um resumo do mês em uma olhada.</p></div>
       <div class="topo-acoes" id="acoes"></div>
     </header>
@@ -324,6 +440,14 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
           <div class="card"><div class="card-cab"><h2>Atenção às faltas</h2><span class="selo amarelo">3 faltas ou mais</span></div>
             <div class="card-corpo" id="alerta-faltas"></div></div>
         </div>
+        <div style="height:18px"></div>
+        <div class="card">
+          <div class="card-cab"><h2>Calendário do mês</h2><span class="selo" id="cal-selo">—</span>
+            <div class="dir"><span class="selo verde">verde = todos vieram</span><span class="selo vermelho">vermelho = teve falta</span></div></div>
+          <div class="card-corpo"><div class="cal" id="cal-painel"></div>
+            <p style="margin:14px 0 0;font-size:12.5px;color:var(--suave)">Toque em um dia para abrir a frequência dele.</p></div>
+        </div>
+
         <div style="height:18px"></div>
         <div class="card"><div class="card-cab"><h2>Últimas atividades escritas</h2><button class="btn mini" data-ir="registro">Abrir caderno</button></div>
           <div class="card-corpo" id="ultimos"></div></div>
@@ -458,6 +582,20 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
         </div>
       </section>
 
+      <!-- RELATÓRIOS -->
+      <section class="panel" id="p-relatorios">
+        <div class="card" style="margin-bottom:18px">
+          <div class="card-cab"><h2>Frequência por criança</h2><span class="selo" id="rel-selo">—</span>
+            <div class="dir">
+              <select id="rel-mes" class="btn" style="padding:8px 10px"></select>
+              <button class="btn" id="btn-csv-freq">Planilha da frequência</button>
+              <button class="btn" id="btn-csv-turma">Planilha da turma</button>
+            </div></div>
+          <div class="card-corpo" style="padding:6px 8px 10px;overflow:auto" id="rel-corpo"></div>
+        </div>
+        <div id="rel-detalhe"></div>
+      </section>
+
       <!-- CAPAS -->
       <section class="panel" id="p-capas">
         <div class="capas" id="capas"></div>
@@ -479,27 +617,6 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
           </div>
         </div>
 
-        <div class="card" style="margin-bottom:18px">
-          <div class="card-cab"><h2>Conexão com o Supabase</h2><span class="selo" id="sb-estado">Não configurado</span></div>
-          <div class="card-corpo">
-            <p id="sb-origem" style="margin:0 0 16px;font-size:13px;color:var(--suave)"></p>
-            <div class="grade g2" style="margin-bottom:16px">
-              <div class="campo"><label>URL do projeto</label><input id="sb-url" placeholder="https://kbienvekhnwnqplwkwrv.supabase.co"></div>
-              <div class="campo"><label>Chave anônima (anon public)</label><input id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtiaWVudmVraG53bnFwbHdrd3J2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyOTA0MDMsImV4cCI6MjEwMDg2NjQwM30.G2jo07NWVoNe3BWVd63jr0Pl5Xxfb4izQ12_eRhXbY0"></div>
-            </div>
-            <div style="display:flex;gap:9px;flex-wrap:wrap;margin-bottom:18px">
-              <button class="btn primario" id="btn-sb-salvar">Salvar e testar conexão</button>
-              <button class="btn" id="btn-sb-sql">Ver o SQL das tabelas</button>
-              <button class="btn perigo" id="btn-sb-limpar">Desconectar</button>
-              <button class="btn perigo" id="btn-apagar-conta">Apagar minha conta</button>
-            </div>
-            <div class="dica" style="margin-bottom:16px"><span>🔒</span><div>
-              <b>Leia antes de usar com dados reais:</b> entrar só com celular e primeiro nome identifica a professora, mas não protege a conta — quem souber os dois entra, e a chave anônima dá acesso de leitura à tabela. Para uso oficial com dados de crianças, troque por <b>Supabase Auth com código por SMS</b> e restrinja as políticas a <code>auth.uid()</code>.</div></div>
-            <div id="sql-cx" style="display:none"><pre class="sql" id="sql-txt"></pre>
-              <button class="btn mini" id="btn-copiar-sql" style="margin-top:10px">Copiar SQL</button></div>
-          </div>
-        </div>
-
         <div class="card">
           <div class="card-cab"><h2>Cópia de segurança</h2></div>
           <div class="card-corpo">
@@ -517,6 +634,14 @@ pre.sql{background:#0F2438;color:#CFE3F5;padding:16px;border-radius:11px;font-fa
     </div>
   </main>
 </div>
+
+<nav class="tabs no-print" id="tabs">
+  <button class="tab-item on" data-ir="painel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Painel</button>
+  <button class="tab-item" data-ir="frequencia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>Frequência</button>
+  <button class="tab-item" data-ir="registro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4h13l3 3v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z"/><path d="M7 9h9M7 13h9"/></svg>Caderno</button>
+  <button class="tab-item" data-ir="relatorios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 21V9M12 21V4M19 21v-7M3 21h18"/></svg>Relatórios</button>
+  <button class="tab-item" id="tab-menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</button>
+</nav>
 
 <div class="papel-print" id="print-root"></div>
 <div class="toast" id="toast"></div>
@@ -786,8 +911,8 @@ function pintaConta(){
     $('#conta-cel').textContent=mascaraCel(USUARIO.celular);
     $('#modo-txt').innerHTML=MODO==='nuvem'?'Salvando na nuvem (Supabase).':'Modo local: os dados ficam neste aparelho.';
   }else cx.style.display='none';
-  $('#sb-estado').textContent=SB.pronto()?'Conectado':'Não configurado';
-  $('#sb-estado').className='selo '+(SB.pronto()?'verde':'');
+  const est=$('#sb-estado');
+  if(est){est.textContent=SB.pronto()?'Conectado':'Não configurado';est.className='selo '+(SB.pronto()?'verde':'')}
 }
 
 async function autenticar(){
@@ -886,12 +1011,14 @@ const TITULOS={
   registro:['Registro do trabalho realizado','Escreva as experiências do dia direto sobre as linhas.'],
   atividades:['Gerador de atividades','Fotografe uma atividade, ajuste o texto e gere a folha em PDF.'],
   alunos:['Alunos','Quem faz parte da turma.'],
+  relatorios:['Relatórios','Como está a frequência de cada criança, mês a mês.'],
   capas:['Capas e fichas','Capas de identificação prontas para imprimir.'],
   config:['Escola e conta','Dados da escola, conexão com o banco e cópias de segurança.']
 };
 function ir(nome){
   $$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+nome));
-  $$('.nav-item[data-ir]').forEach(b=>b.classList.toggle('on',b.dataset.ir===nome));
+  $$('.nav-item[data-ir],.tab-item[data-ir]').forEach(b=>b.classList.toggle('on',b.dataset.ir===nome));
+  document.body.classList.remove('menu-aberto');
   $('#tit').textContent=TITULOS[nome][0]; $('#sub').textContent=TITULOS[nome][1];
   const a=$('#acoes'); a.innerHTML='';
   const bt=(txt,fn,cls='btn')=>{const b=document.createElement('button');b.className=cls;b.textContent=txt;b.onclick=fn;a.appendChild(b)};
@@ -901,8 +1028,10 @@ function ir(nome){
   if(nome==='capas')bt('Imprimir capas',()=>imprimir('capas'),'btn primario');
   if(nome==='painel')bt('Ir para a frequência',()=>ir('frequencia'),'btn primario');
   if(nome==='atividades')bt('Gerar PDF',gerarPDF,'btn primario');
+  if(nome==='relatorios')bt('Baixar planilha',()=>csvFrequencia(),'btn primario');
   window.scrollTo({top:0,behavior:'smooth'});
-  if(nome==='painel')painel(); if(nome==='capas')capas(); if(nome==='alunos')alunos(); if(nome==='atividades')atividades();
+  if(nome==='painel')painel(); if(nome==='capas')capas(); if(nome==='alunos')alunos();
+  if(nome==='atividades')atividades(); if(nome==='relatorios')relatorios();
 }
 document.addEventListener('click',e=>{const b=e.target.closest('[data-ir]'); if(b)ir(b.dataset.ir)});
 
@@ -1122,6 +1251,7 @@ function painel(){
       <span style="font-weight:500">${esc(x.a.nome)||'sem nome'}</span>
       <span class="selo vermelho" style="margin-left:auto">${x.f} faltas</span></div>`));
 
+  calendarioDoPainel();
   const u=$('#ultimos'),regs=(S.reg[S.mesReg]||[]).filter(e=>(e.texto||'').trim()).slice(-4).reverse();
   u.innerHTML=regs.length?'':`<div style="color:var(--suave);font-size:13.5px">Nada escrito ainda neste mês.</div>`;
   regs.forEach(e=>u.insertAdjacentHTML('beforeend',
@@ -1565,6 +1695,185 @@ function listaAtividades(){
   });
 }
 
+
+/* ===================== CALENDÁRIO ===================== */
+// pinta(d) devolve {cls, base} para cada dia do mês
+function montaCalendario(alvo,k,pinta,aoClicar){
+  const el=typeof alvo==='string'?$(alvo):alvo; if(!el)return;
+  const nd=diasNoMes(k), primeiro=semanaDe(k,1);
+  const hojeK=mesAtual(), diaHoje=hoje.getDate();
+  let html=['D','S','T','Q','Q','S','S'].map(x=>`<div class="cabc">${x}</div>`).join('');
+  for(let i=0;i<primeiro;i++)html+='<div class="dia vazia"></div>';
+  for(let d=1;d<=nd;d++){
+    const w=semanaDe(k,d);
+    const info=pinta(d)||{};
+    const cls=[ 'dia', info.cls||'', ehOff(k,d)?'off':'', (w===0||w===6)?'fds':'',
+                (k===hojeK&&d===diaHoje)?'hoje':'', aoClicar?'clicavel':'' ].filter(Boolean).join(' ');
+    html+=`<div class="${cls}" data-d="${d}" ${aoClicar?'role="button" tabindex="0"':''}>
+      <b>${d}</b>${info.base?`<small>${info.base}</small>`:''}${info.barra?'<i style="opacity:'+info.barra+'"></i>':''}</div>`;
+  }
+  el.innerHTML=html;
+  if(aoClicar)el.querySelectorAll('.dia[data-d]').forEach(c=>{
+    const ir=()=>aoClicar(+c.dataset.d);
+    c.onclick=ir;
+    c.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();ir()}};
+  });
+}
+function calendarioDoPainel(){
+  const k=S.mesAtivo, fx=marcasMes(k), total=S.alunos.length;
+  const selo=$('#cal-selo'); if(selo)selo.textContent=rotuloMes(k);
+  montaCalendario('#cal-painel',k,d=>{
+    let p=0,f=0,marcados=0;
+    S.alunos.forEach(a=>{const v=(fx[a.id]||{})[d]; if(!v)return; marcados++;
+      if(v==='P'||v==='A')p++; else if(v==='F')f++;});
+    if(!marcados)return {};
+    return {cls:f?'f':'p', base:`${p}/${total||marcados}`, barra:Math.max(.25,p/(total||marcados))};
+  },d=>{ ir('frequencia');
+    setTimeout(()=>{
+      const alvo=$(`#tab-freq th.dia[data-d="${d}"]`);
+      if(alvo){alvo.scrollIntoView({behavior:'smooth',inline:'center',block:'nearest'});
+        alvo.style.transition='background .3s'; alvo.style.background='#FDF3DC';
+        setTimeout(()=>{alvo.style.background=''},1400);}
+    },260);
+  });
+}
+
+/* ===================== RELATÓRIOS ===================== */
+let relSelecionado=null;
+function resumoDoAluno(id,k){
+  const nd=diasNoMes(k), m=marcasMes(k)[id]||{};
+  let p=0,f=0,j=0,at=0,marcados=0;
+  for(let d=1;d<=nd;d++){ if(ehOff(k,d))continue; const v=m[d]; if(!v)continue; marcados++;
+    if(v==='P')p++; else if(v==='F')f++; else if(v==='J')j++; else if(v==='A')at++; }
+  const presencas=p+at;
+  return {p,f,j,at,presencas,marcados,pct:marcados?Math.round(presencas/marcados*100):null};
+}
+function relatorios(){
+  const sel=$('#rel-mes'); if(!sel)return;
+  if(!sel.options.length){ selMeses(sel,S.mesAtivo);
+    sel.onchange=e=>{S.mesAtivo=e.target.value;salvar();relatorios();freqTabela();painel()}; }
+  sel.value=S.mesAtivo;
+  const k=S.mesAtivo;
+  $('#rel-selo').textContent=rotuloMes(k);
+
+  const cx=$('#rel-corpo');
+  if(!S.alunos.length){
+    cx.innerHTML=`<div class="vazio"><div style="font-size:32px">📊</div><h3>Sem crianças cadastradas</h3>
+      <p>Os relatórios aparecem assim que a turma for preenchida em <b>Alunos</b>.</p></div>`;
+    $('#rel-detalhe').innerHTML=''; return;
+  }
+  const linhas=S.alunos.map((a,i)=>({a,i,r:resumoDoAluno(a.id,k)}));
+  let html=`<table class="rel-tab"><thead><tr>
+    <th style="width:34px">Nº</th><th>Criança</th>
+    <th class="esconde-mob" style="width:70px">Presenças</th>
+    <th style="width:60px">Faltas</th>
+    <th class="esconde-mob" style="width:70px">Justif.</th>
+    <th style="width:180px">Frequência</th></tr></thead><tbody>`;
+  linhas.forEach(({a,i,r})=>{
+    const faixa=r.pct===null?'':(r.pct>=75?'':(r.pct>=50?'media':'baixa'));
+    html+=`<tr data-id="${a.id}" class="${relSelecionado===a.id?'sel':''}">
+      <td class="num" style="color:var(--suave)">${String(i+1).padStart(2,'0')}</td>
+      <td><div style="display:flex;align-items:center;gap:9px">
+        <div class="avatar" style="background:${CORES[i%CORES.length]}">${inicial(a.nome)}</div>
+        <span style="font-weight:500">${esc(a.nome)||'<i style="color:#9AAAB8">sem nome</i>'}</span></div></td>
+      <td class="num esconde-mob">${r.presencas||'—'}</td>
+      <td class="num" style="color:${r.f?'var(--carimbo)':'var(--suave)'}">${r.f||'—'}</td>
+      <td class="num esconde-mob">${r.j||'—'}</td>
+      <td><div style="display:flex;align-items:center;gap:9px">
+        <div class="trilho" style="flex:1"><i class="${faixa}" style="width:${r.pct||0}%"></i></div>
+        <b class="num" style="width:42px;text-align:right">${r.pct===null?'—':r.pct+'%'}</b></div></td></tr>`;
+  });
+  cx.innerHTML=html+'</tbody></table>';
+  cx.querySelectorAll('tr[data-id]').forEach(tr=>{
+    tr.onclick=()=>{ relSelecionado=relSelecionado===tr.dataset.id?null:tr.dataset.id; relatorios(); };
+  });
+  detalheDoAluno(k);
+}
+function detalheDoAluno(k){
+  const cx=$('#rel-detalhe');
+  const al=S.alunos.find(a=>a.id===relSelecionado);
+  if(!al){ cx.innerHTML=`<div class="dica"><span>👆</span><div>Toque no nome de uma criança para ver o calendário dela, dia a dia.</div></div>`; return; }
+  const r=resumoDoAluno(al.id,k), m=marcasMes(k)[al.id]||{};
+  cx.innerHTML=`<div class="card"><div class="card-cab">
+      <div class="avatar" style="background:var(--tinta-2)">${inicial(al.nome)}</div>
+      <h2>${esc(al.nome)||'sem nome'}</h2><span class="selo">${rotuloMes(k)}</span>
+      <div class="dir"><button class="btn mini" id="rel-fechar">Fechar</button></div></div>
+    <div class="card-corpo">
+      <div class="metricas" style="margin-bottom:18px">
+        <div class="metrica b"><div class="r">Presenças</div><div class="n">${r.presencas}</div><div class="p">${r.at?r.at+' com atestado':'dias em que veio'}</div></div>
+        <div class="metrica c"><div class="r">Faltas</div><div class="n">${r.f}</div><div class="p">${r.j?r.j+' justificadas':'sem justificativa'}</div></div>
+        <div class="metrica"><div class="r">Frequência</div><div class="n">${r.pct===null?'—':r.pct+'%'}</div><div class="p">em ${r.marcados} dias marcados</div></div>
+        <div class="metrica d"><div class="r">Situação</div><div class="n" style="font-size:19px;padding-top:9px">${al.situacao==='transferido'?'Transferida':(al.situacao==='abandono'?'Abandono':'Frequentando')}</div><div class="p">${al.nasc?'nasc. '+al.nasc.split('-').reverse().join('/'):'sem data de nascimento'}</div></div>
+      </div>
+      <div class="cal" id="cal-aluno"></div>
+      <div class="legenda" style="margin-top:16px">
+        <span><b style="color:var(--quadro)">verde</b> presente</span>
+        <span><b style="color:var(--carimbo)">vermelho</b> falta</span>
+        <span><b style="color:#8A6410">amarelo</b> justificada</span>
+        <span><b style="color:var(--lilas)">roxo</b> atestado</span>
+        <span style="margin-left:auto">Toque em um dia para mudar a marcação.</span>
+      </div></div></div>`;
+  const mapa={P:'p',F:'f',J:'j',A:'a'};
+  montaCalendario('#cal-aluno',k,d=>{
+    const v=m[d]; return v?{cls:mapa[v],base:SIMB[v]==='•'?'veio':SIMB[v]}:{};
+  },d=>{
+    if(ehOff(k,d))return toast('Este dia está marcado como não letivo.');
+    const mm=marcasMes(k)[al.id]||(marcasMes(k)[al.id]={});
+    mm[d]=CICLO[(CICLO.indexOf(mm[d]||'')+1)%CICLO.length];
+    if(!mm[d])delete mm[d];
+    salvar(); relatorios(); painel(); freqTabela();
+  });
+  $('#rel-fechar').onclick=()=>{relSelecionado=null;relatorios()};
+}
+
+/* ===================== PLANILHAS (CSV) ===================== */
+function baixarCSV(nome,linhas){
+  const txt='\ufeff'+linhas.map(l=>l.map(c=>`"${String(c==null?'':c).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([txt],{type:'text/csv;charset=utf-8'}));
+  a.download=nome; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('Planilha baixada. Abre no Excel e no Google Planilhas.');
+}
+function csvFrequencia(){
+  if(!S.alunos.length)return erro('Não há crianças cadastradas.');
+  const k=S.mesAtivo,nd=diasNoMes(k),fx=marcasMes(k);
+  const cab=['Nº','Nome da criança'];
+  for(let d=1;d<=nd;d++)cab.push(d+'/'+k.split('-')[1]);
+  cab.push('Presenças','Faltas','Justificadas','Frequência %');
+  const linhas=[[S.escola.nome||''],['Turma '+(S.escola.turma||''),'Professora: '+(S.escola.prof||''),rotuloMes(k)],[],cab];
+  S.alunos.forEach((a,i)=>{
+    const m=fx[a.id]||{}, r=resumoDoAluno(a.id,k), l=[i+1,a.nome||''];
+    for(let d=1;d<=nd;d++)l.push(ehOff(k,d)?'—':(m[d]||''));
+    l.push(r.presencas,r.f,r.j,r.pct===null?'':r.pct+'%');
+    linhas.push(l);
+  });
+  baixarCSV(`frequencia-${k}.csv`,linhas);
+}
+function csvTurma(){
+  if(!S.alunos.length)return erro('Não há crianças cadastradas.');
+  const linhas=[['Nº','Nome da criança','Nascimento','Situação']];
+  S.alunos.forEach((a,i)=>linhas.push([i+1,a.nome||'',a.nasc?a.nasc.split('-').reverse().join('/'):'',
+    a.situacao==='transferido'?'Transferido(a)':(a.situacao==='abandono'?'Abandono':'Frequentando')]));
+  baixarCSV('turma.csv',linhas);
+}
+$('#btn-csv-freq').onclick=csvFrequencia;
+$('#btn-csv-turma').onclick=csvTurma;
+
+/* ===================== MENU EM TELAS PEQUENAS ===================== */
+$('#btn-menu').onclick=()=>document.body.classList.toggle('menu-aberto');
+$('#tab-menu').onclick=()=>document.body.classList.toggle('menu-aberto');
+$('#veu').onclick=()=>document.body.classList.remove('menu-aberto');
+document.addEventListener('keydown',e=>{ if(e.key==='Escape')document.body.classList.remove('menu-aberto') });
+$('#btn-recolher').onclick=async()=>{
+  document.body.classList.toggle('compacta');
+  await local.set('pauta:menu',{compacta:document.body.classList.contains('compacta')});
+};
+// rotulos dos itens viram <span> para poderem sumir no modo recolhido
+$$('.nav-item').forEach(b=>{
+  const t=[...b.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());
+  if(t){const sp=document.createElement('span');sp.className='rot';sp.textContent=t.textContent.trim();t.replaceWith(sp)}
+});
+
 /* ===================== CONFIG ===================== */
 const MAPA={'c-escola':'nome','c-endereco':'endereco','c-sala':'sala','c-turma':'turma','c-prof':'prof','c-assist':'assist','c-turno':'turno','c-ano':'anoLetivo'};
 function config(){
@@ -1572,39 +1881,28 @@ function config(){
     const el=document.getElementById(id); el.value=S.escola[ch]||'';
     el.oninput=()=>{S.escola[ch]=el.value;salvar();capas()};
   });
-  $('#sb-url').value=SB.url; $('#sb-key').value=SB.key; $('#sql-txt').textContent=SQL;
-  const embutido=!!(SUPABASE_PADRAO.url&&SUPABASE_PADRAO.key);
-  const nota=$('#sb-origem');
-  if(nota) nota.innerHTML = embutido
-    ? 'Conex\u00e3o j\u00e1 vem configurada dentro do arquivo \u2014 n\u00e3o precisa mexer aqui.'
-    : 'Sem conex\u00e3o configurada. Preencha abaixo, ou deixe as credenciais fixas no in\u00edcio do arquivo (bloco <b>SUPABASE_PADRAO</b>) para nunca mais ver esta tela.';
+  const campoUrl=$('#sb-url'); if(campoUrl){campoUrl.value=SB.url}
+  const campoKey=$('#sb-key'); if(campoKey){campoKey.value=SB.key}
+  const campoSql=$('#sql-txt'); if(campoSql){campoSql.textContent=SQL}
 }
-$('#btn-sb-sql').onclick=()=>{const c=$('#sql-cx');c.style.display=c.style.display==='none'?'block':'none'};
-$('#btn-copiar-sql').onclick=async()=>{
-  try{await navigator.clipboard.writeText(SQL);toast('SQL copiado')}catch(e){erro('O navegador bloqueou a cópia. Selecione o texto e copie à mão.')}
-};
-$('#btn-sb-salvar').onclick=async()=>{
-  const btn=$('#btn-sb-salvar'), url=$('#sb-url').value.trim(), key=$('#sb-key').value.trim();
-  if(!url||!key)return erro('Preencha a URL e a chave anonima.');
-  if(!/^https:\/\/.+/.test(url))return erro('A URL deve comecar com https://');
-  btn.disabled=true; btn.innerHTML='<span class="carregando"></span> Testando\u2026';
+/* Configuracao do banco: fora da vista. Ctrl+Shift+D abre para quem mantem o site. */
+document.addEventListener('keydown',async e=>{
+  if(!(e.ctrlKey&&e.shiftKey&&(e.key==='D'||e.key==='d')))return;
+  e.preventDefault();
+  const atual=SB.pronto()?SB.url:'(nenhuma)';
+  const url=prompt('Manutencao \u2014 URL do Supabase\nAtual: '+atual+'\n\nDeixe vazio para cancelar.',SB.url||'');
+  if(!url)return;
+  const key=prompt('Chave anonima (anon public):',SB.key||'');
+  if(!key)return;
   const antes={url:SB.url,key:SB.key};
-  SB.url=url; SB.key=key;
+  SB.url=url.trim(); SB.key=key.trim();
   try{
     const r=await SB.rpc('pauta_ping',{});
-    if(!r||!r.ok)throw new Error('O banco respondeu, mas nao do jeito esperado. Rode o SQL de novo.');
-    await local.set(K_SB,{url,key});
-    toast('Conectado ao Supabase. Saia e entre de novo para usar a conta na nuvem.');
-  }catch(e){
-    SB.url=antes.url; SB.key=antes.key;
-    erro('Conexao recusada: '+e.message);
-  }finally{ btn.disabled=false; btn.textContent='Salvar e testar conexao'; pintaConta() }
-};
-$('#btn-sb-limpar').onclick=async()=>{
-  if(!confirm('Desconectar do Supabase? O sistema volta a salvar só neste aparelho.'))return;
-  SB.url=''; SB.key=''; MODO='local'; await local.del(K_SB);
-  $('#sb-url').value=''; $('#sb-key').value=''; pintaConta(); toast('Desconectado. Modo local ativo.');
-};
+    if(!r||!r.ok)throw new Error('Resposta inesperada do banco.');
+    await local.set(K_SB,{url:SB.url,key:SB.key});
+    toast('Conexao trocada. Saia e entre de novo.');
+  }catch(err){ SB.url=antes.url; SB.key=antes.key; erro('Conexao recusada: '+err.message) }
+});
 $('#btn-exportar').onclick=()=>{
   const b=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(b);
@@ -1622,6 +1920,7 @@ $('#file-in').onchange=e=>{
     }catch(err){ erro('Esse arquivo não é uma cópia do Pauta.') } };
   r.readAsText(f); e.target.value='';
 };
+const _btnApagarConta=$('#btn-apagar-conta');
 $('#btn-limpar').onclick=async()=>{
   if(!confirm('Isso apaga a turma, a frequencia, o caderno e as atividades. Tem certeza?'))return;
   const m={mesAtivo:S.mesAtivo,mesReg:S.mesReg};
@@ -1632,7 +1931,7 @@ $('#btn-limpar').onclick=async()=>{
     iniciarTela(); toast('Tudo apagado');
   }catch(e){ erro('Apaguei neste aparelho, mas nao na nuvem: '+e.message) }
 };
-$('#btn-apagar-conta').onclick=async()=>{
+if(_btnApagarConta)_btnApagarConta.onclick=async()=>{
   if(MODO!=='nuvem'||!USUARIO||!USUARIO.token)return erro('So da para apagar a conta quando ela esta na nuvem.');
   if(!confirm('Isso apaga a CONTA inteira do banco de dados, com todos os diarios. Nao tem volta. Continuar?'))return;
   if(!confirm('Ultima confirmacao: apagar a conta '+mascaraCel(USUARIO.celular)+' para sempre?'))return;
@@ -1705,9 +2004,11 @@ function imprimir(tipo){
 function iniciarTela(){
   selMeses($('#f-mes'),S.mesAtivo); selMeses($('#r-mes'),S.mesReg);
   $('#f-ano').value=S.mesAtivo.split('-')[0];
-  config(); alunos(); freqTabela(); registro(); capas(); atividades(); painel(); contarTexto();
+  config(); alunos(); freqTabela(); registro(); capas(); atividades(); relatorios(); painel(); contarTexto();
 }
 (async()=>{
+  const pref=await local.get('pauta:menu');
+  if(pref&&pref.compacta&&window.innerWidth>880)document.body.classList.add('compacta');
   const cfg=await local.get(K_SB);
   if(cfg&&cfg.url){ SB.url=cfg.url; SB.key=cfg.key; }
   else if(SUPABASE_PADRAO.url&&SUPABASE_PADRAO.key){
